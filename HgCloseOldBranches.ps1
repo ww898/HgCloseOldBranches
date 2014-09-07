@@ -45,11 +45,9 @@ Write-Host -foregroundcolor gray $current.name
     $result.node = $parts[1]
     $result.name = $parts[2]
     $result
-  } | Where-Object { $now - $_.date -gt $alive })
+  } | Where-Object { $now - $_.date -gt $alive } | Sort-Object -property date)
 
-[System.Array]::Reverse($branches)
-
-function FixBranchName
+function EscapeBranchName
 {
   Param([System.String]$name)
   $name.Replace('"', '\"')
@@ -64,7 +62,7 @@ if ($branches.Length -eq 0) { Write-Host "No old branches were detected" } else 
 
       & hg debugsetparent $_.node | Out-Null
       if ($LastExitCode -ne 0) { Write-Warning "Failed to set node (exit code $LastExitCode)." } else {
-        & hg branch $(FixBranchName $_.name) | Out-Null
+        & hg branch $(EscapeBranchName $_.name) | Out-Null
         if ($LastExitCode -ne 0) { Write-Warning "Failed to set branch (exit code $LastExitCode)." } else {
           & hg commit --close-branch -X * -m $("The branch was not used for {0:%d} days and closed automatically." -f ($now - $_.date)) | Out-Null
           if ($LastExitCode -ne 0) { Write-Warning "Failed to commit (exit code $LastExitCode)." }
@@ -77,7 +75,7 @@ if ($branches.Length -eq 0) { Write-Host "No old branches were detected" } else 
 
   & hg debugsetparent $current.node | Out-Null
   if ($LastExitCode -ne 0) { Write-Warning "Failed to set node (exit code $LastExitCode)." } else {
-    & hg branch $(FixBranchName $current.name) | Out-Null
+    & hg branch $(EscapeBranchName $current.name) | Out-Null
     if ($LastExitCode -ne 0) { Write-Warning "Failed to set branch (exit code $LastExitCode)." }
   }
 }
