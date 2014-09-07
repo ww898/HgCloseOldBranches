@@ -34,7 +34,8 @@ $script:VerbosePreference = "Continue"
     $result
   } | Select-Object
 
-"Current branch is {0}" -f $current.name
+Write-Host "Current branch: " -nonewline
+Write-Host -foregroundcolor gray $current.name
 
 [System.Object[]]$branches = @(& hg head -T "{date(date,'%Y%m%d%H%M%S')} {node} {branch}\n" | ForEach-Object {
     $result = $_ | Select-Object -Property date, node, name
@@ -48,16 +49,29 @@ $script:VerbosePreference = "Continue"
 
 [System.Array]::Reverse($branches)
 
-if ($branches.Length -eq 0) { "No old branches were detected" } else {
-  "Closing {0} old branches:" -f $branches.Length
+if ($branches.Length -eq 0) { Write-Host "No old branches were detected" } else {
+  Write-Host "Closing $($branches.Length) old branches:"
+
   $branches | ForEach-Object {
-      "[{0:%d} days] {1}" -f ($now - $_.date), $_.name
+      Write-Host "[$([System.String]::Format("{0:%d}", $now - $_.date)) days] " -nonewline
+      Write-Host -foregroundcolor gray $_.name
+
       & hg debugsetparent $_.node | Out-Null
-      & hg branch $_.name | Out-Null
-      & hg commit --close-branch -X * -m $("The branch was not used for {0:%d} days and closed automatically." -f ($now - $_.date)) | Out-Null
+      if ($LastExitCode -ne 0) { Write-Warning "Failed to set node (exit code $LastExitCode)." } else {
+        & hg branch $_.name | Out-Null
+        if ($LastExitCode -ne 0) { Write-Warning "Failed to set branch (exit code $LastExitCode)." } else {
+          & hg commit --close-branch -X * -m $("The branch was not used for {0:%d} days and closed automatically." -f ($now - $_.date)) | Out-Null
+          if ($LastExitCode -ne 0) { Write-Warning "Failed to commit (exit code $LastExitCode)." }
+        }
+      }
     }
 
-  "Restore current branch {0}" -f $current.name
+  Write-Host "Restore current branch: " -nonewline
+  Write-Host -foregroundcolor gray $current.name
+
   & hg debugsetparent $current.node | Out-Null
-  & hg branch $current.name | Out-Null
+  if ($LastExitCode -ne 0) { Write-Warning "Failed to set node (exit code $LastExitCode)." } else {
+    & hg branch $current.name | Out-Null
+    if ($LastExitCode -ne 0) { Write-Warning "Failed to set branch (exit code $LastExitCode)." }
+  }
 }
