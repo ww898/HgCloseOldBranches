@@ -25,7 +25,7 @@ $script:VerbosePreference = "Continue"
 [System.TimeSpan]$alive = [System.TimeSpan]::FromDays(60)
 [System.DateTime]$now = [System.DateTime]::Now
 
-[System.Object]$current = & hg parent -T "{node} {branch}" | ForEach-Object {
+[System.Object]$current = & hg parent --encoding utf8 -T "{node} {branch}" | ForEach-Object {
     $result = $_ | Select-Object -Property node, name
     $parts = $_.Split(' ', 2)
     
@@ -37,7 +37,7 @@ $script:VerbosePreference = "Continue"
 Write-Host "Current branch: " -nonewline
 Write-Host -foregroundcolor gray $current.name
 
-[System.Object[]]$branches = @(& hg head -T "{date(date,'%Y%m%d%H%M%S')} {node} {branch}\n" | ForEach-Object {
+[System.Object[]]$branches = @(& hg head --encoding utf8 -T "{date(date,'%Y%m%d%H%M%S')} {node} {branch}\n" | ForEach-Object {
     $result = $_ | Select-Object -Property date, node, name
     $parts = $_.Split(' ', 3)
 
