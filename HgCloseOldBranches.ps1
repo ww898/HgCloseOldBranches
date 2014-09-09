@@ -26,6 +26,26 @@ $encoding = "cp866"
 [System.TimeSpan]$alive = [System.TimeSpan]::FromDays(60)
 [System.DateTime]$now = [System.DateTime]::Now
 
+function GetHgRoot
+{
+    Param([System.String]$path)
+
+    if (Test-Path -Path "$path\.hg" -PathType Container) {
+        return $path
+    } else {
+        $parent = Split-Path -Path "$path" -Parent
+        if ($parent.Length -gt 0) {
+          GetHgRoot $parent
+        }
+    }
+}
+
+$root = GetHgRoot (Get-Item -Path .).FullName
+if (-not $(Split-Path -Path "$root" -IsAbsolute)) { throw "Failed to detect repository root directory" }
+
+Write-Host "Repository root: " -nonewline
+Write-Host -foregroundcolor darkgray $root
+
 [System.Object]$current = & hg parent --encoding $encoding -T "{node} {branch}" | ForEach-Object {
     $result = $_ | Select-Object -Property node, name
     $parts = $_.Split(' ', 2)
@@ -55,6 +75,27 @@ function EscapeBranchName
 }
 
 if ($branches.Length -eq 0) { Write-Host "No old branches were detected" } else {
+  $hgSub = "$root\.hgsub"
+  $hgSubState = "$root\.hgsubstate"
+
+  $backupHgSub = "$hgSub.tmp"
+  $backupHgSubState = "$hgSubState.tmp"
+
+  [System.Boolean]$hasHgSub = Test-Path -Path "$hgSub" -PathType Leaf
+  [System.Boolean]$hasHgSubState = Test-Path -Path "$hgSubState" -PathType Leaf
+
+  if ($hasHgSub) {
+    Write-Host "Backup: " -nonewline
+    Write-Host -foregroundcolor darkgray $hgSub
+    Rename-Item "$hgSub" "$backupHgSub"
+  }
+
+  if ($hasHgSubState) {
+    Write-Host "Backup: " -nonewline
+    Write-Host -foregroundcolor darkgray $hgSubState
+    Rename-Item "$hgSubState" "$backupHgSubState"
+  }
+
   Write-Host "Closing $($branches.Length) old branches:"
 
   $branches | ForEach-Object {
@@ -70,6 +111,18 @@ if ($branches.Length -eq 0) { Write-Host "No old branches were detected" } else 
         }
       }
     }
+
+  if ($hasHgSubState) {
+    Write-Host "Restore: " -nonewline
+    Write-Host -foregroundcolor darkgray $hgSubState
+    Rename-Item "$backupHgSubState" "$hgSubState"
+  }
+
+  if ($hasHgSub) {
+    Write-Host "Restore: " -nonewline
+    Write-Host -foregroundcolor darkgray $hgSub
+    Rename-Item "$backupHgSub" "$hgSub"
+  }
 
   Write-Host "Restore current branch: " -nonewline
   Write-Host -foregroundcolor gray $current.name
