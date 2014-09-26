@@ -66,7 +66,7 @@ Write-Host -foregroundcolor gray $current.name
     $result.node = $parts[1]
     $result.name = $parts[2]
     $result
-  } | Where-Object { $now - $_.date -gt $alive } | Sort-Object -property date)
+  } | Sort-Object -Property date)
 
 function EscapeBranchName
 {
@@ -74,26 +74,43 @@ function EscapeBranchName
   $name.Replace('"', '\"')
 }
 
+[System.String[]]$ignoreBranches = @()
+
+$ignoreBranchesFile = "$root\.close_old_branches_ignore"
+if (Test-Path -Path "$ignoreBranchesFile" -PathType Leaf) {
+  $ignoreBranches += Get-Content -Path "$ignoreBranchesFile" | Where-Object { $_ }
+}
+
+if ($ignoreBranches.Length -eq 0) { Write-Host "No ignored branches" } else {
+  Write-Host "Ignore $($ignoreBranches.Length) branches:"
+  $ignoreBranches | ForEach-Object {
+    Write-Host -foregroundcolor gray $_
+    if (-not (($branches).name -Contains $_)) { Write-Warning "Unknown branch '$_'." }
+  }
+}
+
+$branches = @($branches | Where-Object { $now - $_.date -gt $alive } | Where-Object { -not ($ignoreBranches -Contains $_.name) })
+
 if ($branches.Length -eq 0) { Write-Host "No old branches were detected" } else {
-  $hgSub = "$root\.hgsub"
-  $hgSubState = "$root\.hgsubstate"
+  $hgSubFile = "$root\.hgsub"
+  $hgSubStateFile = "$root\.hgsubstate"
 
-  $backupHgSub = "$hgSub.tmp"
-  $backupHgSubState = "$hgSubState.tmp"
+  $backupHgSubFile = "$hgSubFile.tmp"
+  $backupHgSubStateFile = "$hgSubStateFile.tmp"
 
-  [System.Boolean]$hasHgSub = Test-Path -Path "$hgSub" -PathType Leaf
-  [System.Boolean]$hasHgSubState = Test-Path -Path "$hgSubState" -PathType Leaf
+  [System.Boolean]$hasHgSub = Test-Path -Path "$hgSubFile" -PathType Leaf
+  [System.Boolean]$hasHgSubState = Test-Path -Path "$hgSubStateFile" -PathType Leaf
 
   if ($hasHgSub) {
     Write-Host "Backup: " -nonewline
-    Write-Host -foregroundcolor darkgray $hgSub
-    Rename-Item "$hgSub" "$backupHgSub"
+    Write-Host -foregroundcolor darkgray $hgSubFile
+    Rename-Item "$hgSubFile" "$backupHgSubFile"
   }
 
   if ($hasHgSubState) {
     Write-Host "Backup: " -nonewline
-    Write-Host -foregroundcolor darkgray $hgSubState
-    Rename-Item "$hgSubState" "$backupHgSubState"
+    Write-Host -foregroundcolor darkgray $hgSubStateFile
+    Rename-Item "$hgSubStateFile" "$backupHgSubStateFile"
   }
 
   Write-Host "Closing $($branches.Length) old branches:"
@@ -114,14 +131,14 @@ if ($branches.Length -eq 0) { Write-Host "No old branches were detected" } else 
 
   if ($hasHgSubState) {
     Write-Host "Restore: " -nonewline
-    Write-Host -foregroundcolor darkgray $hgSubState
-    Rename-Item "$backupHgSubState" "$hgSubState"
+    Write-Host -foregroundcolor darkgray $hgSubStateFile
+    Rename-Item "$backupHgSubStateFile" "$hgSubStateFile"
   }
 
   if ($hasHgSub) {
     Write-Host "Restore: " -nonewline
-    Write-Host -foregroundcolor darkgray $hgSub
-    Rename-Item "$backupHgSub" "$hgSub"
+    Write-Host -foregroundcolor darkgray $hgSubFile
+    Rename-Item "$backupHgSubFile" "$hgSubFile"
   }
 
   Write-Host "Restore current branch: " -nonewline
