@@ -14,6 +14,18 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+param(
+	[parameter(Mandatory=$false)]
+	[alias("p")]
+	[switch]
+	$performChanges = $false,
+
+	[parameter(Mandatory=$false)]
+	[alias("i", "ignore")]
+	[System.String[]]
+	$ignoreBranches = @()
+)
+
 if ($PSVersionTable.PSVersion.Major -lt 3) {
   throw "PS Version $($PSVersionTable.PSVersion) is below 3.0."
 }
@@ -74,8 +86,6 @@ function EscapeBranchName
   $name.Replace('"', '\"')
 }
 
-[System.String[]]$ignoreBranches = @()
-
 $ignoreBranchesFile = "$root\.close_old_branches_ignore"
 if (Test-Path -Path "$ignoreBranchesFile" -PathType Leaf) {
   $ignoreBranches += Get-Content -Path "$ignoreBranchesFile" | Where-Object { $_ }
@@ -119,12 +129,14 @@ if ($branches.Length -eq 0) { Write-Host "No old branches were detected" } else 
       Write-Host "[$([System.String]::Format("{0:%d}", $now - $_.date)) days] " -nonewline
       Write-Host -foregroundcolor gray $_.name
 
-      & hg debugsetparent $_.node | Out-Null
-      if ($LastExitCode -ne 0) { Write-Warning "Failed to set node (exit code $LastExitCode)." } else {
-        & hg branch $(EscapeBranchName $_.name) | Out-Null
-        if ($LastExitCode -ne 0) { Write-Warning "Failed to set branch (exit code $LastExitCode)." } else {
-          & hg commit --close-branch -X * -m $("The branch was not used for {0:%d} days and closed automatically." -f ($now - $_.date)) | Out-Null
-          if ($LastExitCode -ne 0) { Write-Warning "Failed to commit (exit code $LastExitCode)." }
+      if ($performChanges) {
+        & hg debugsetparent $_.node | Out-Null
+        if ($LastExitCode -ne 0) { Write-Warning "Failed to set node (exit code $LastExitCode)." } else {
+          & hg branch $(EscapeBranchName $_.name) | Out-Null
+          if ($LastExitCode -ne 0) { Write-Warning "Failed to set branch (exit code $LastExitCode)." } else {
+            & hg commit --close-branch -X * -m $("The branch was not used for {0:%d} days and closed automatically." -f ($now - $_.date)) | Out-Null
+            if ($LastExitCode -ne 0) { Write-Warning "Failed to commit (exit code $LastExitCode)." }
+          }
         }
       }
     }
