@@ -59,6 +59,20 @@ if (-not $(Split-Path -Path "$root" -IsAbsolute)) { throw "Failed to detect repo
 Write-Host "Repository root: " -nonewline
 Write-Host -foregroundcolor darkgray $root
 
+function GetIgnoreFilter {
+  Param([string]$dir)
+  [string]$file = Join-Path $dir ".close_old_branches_ignore"
+  if (Test-Path -Path "$file" -PathType Leaf) {
+    Write-Host "Load ignore branches from file: " -nonewline
+    Write-Host -foregroundcolor darkgray $file
+    return Get-Content -Path "$file" | Where-Object { $_ }
+  }
+  return @();
+}
+
+$ignoreBranches += GetIgnoreFilter @(Split-Path -parent $MyInvocation.MyCommand.Definition)
+$ignoreBranches += GetIgnoreFilter $root
+
 [System.Object]$current = & hg parent --encoding $encoding -T "{node} {branch}" | ForEach-Object {
   $result = $_ | Select-Object -Property node, name
   $parts = $_.Split(' ', 2)
@@ -86,16 +100,6 @@ function EscapeBranchName {
   $name.Replace('"', '\"')
 }
 
-$ignoreBranchesFile0 = "$root\.close_old_branches_ignore"
-if (Test-Path -Path "$ignoreBranchesFile0" -PathType Leaf) {
-  $ignoreBranches += Get-Content -Path "$ignoreBranchesFile0" | Where-Object { $_ }
-}
-
-$ignoreBranchesFile1 = "$root\..\.close_old_branches_ignore"
-if (Test-Path -Path "$ignoreBranchesFile1" -PathType Leaf) {
-  $ignoreBranches += Get-Content -Path "$ignoreBranchesFile1" | Where-Object { $_ }
-}
-
 if ($ignoreBranches.Length -eq 0) { Write-Host "No ignored branches" } else {
   Write-Host "Ignore $($ignoreBranches.Length) branches:"
   $ignoreBranches | ForEach-Object {
@@ -113,8 +117,8 @@ $branches = @($branches | Where-Object { $now - $_.date -gt [System.TimeSpan]::F
 })
 
 if ($branches.Length -eq 0) { Write-Host "No old branches were detected" } else {
-  $hgSubFile = "$root\.hgsub"
-  $hgSubStateFile = "$root\.hgsubstate"
+  $hgSubFile = Join-Path $root ".hgsub"
+  $hgSubStateFile = Join-Path $root ".hgsubstate"
 
   $backupHgSubFile = "$hgSubFile.tmp"
   $backupHgSubStateFile = "$hgSubStateFile.tmp"
