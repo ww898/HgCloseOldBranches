@@ -37,9 +37,8 @@ $script:VerbosePreference = "Continue"
 $encoding = "cp866"
 
 Write-Host "Close branches older than: " -nonewline
-Write-Host -foregroundcolor darkgray $graceDays "days"
+Write-Host -foregroundcolor darkgray "$graceDays days"
 
-[System.TimeSpan]$alive = [System.TimeSpan]::FromDays($graceDays)
 [System.DateTime]$now = [System.DateTime]::Now
 
 function GetHgRoot {
@@ -87,20 +86,31 @@ function EscapeBranchName {
   $name.Replace('"', '\"')
 }
 
-$ignoreBranchesFile = "$root\.close_old_branches_ignore"
-if (Test-Path -Path "$ignoreBranchesFile" -PathType Leaf) {
-  $ignoreBranches += Get-Content -Path "$ignoreBranchesFile" | Where-Object { $_ }
+$ignoreBranchesFile0 = "$root\.close_old_branches_ignore"
+if (Test-Path -Path "$ignoreBranchesFile0" -PathType Leaf) {
+  $ignoreBranches += Get-Content -Path "$ignoreBranchesFile0" | Where-Object { $_ }
+}
+
+$ignoreBranchesFile1 = "$root\..\.close_old_branches_ignore"
+if (Test-Path -Path "$ignoreBranchesFile1" -PathType Leaf) {
+  $ignoreBranches += Get-Content -Path "$ignoreBranchesFile1" | Where-Object { $_ }
 }
 
 if ($ignoreBranches.Length -eq 0) { Write-Host "No ignored branches" } else {
   Write-Host "Ignore $($ignoreBranches.Length) branches:"
   $ignoreBranches | ForEach-Object {
+    [int]$count = 0;
+    foreach ($branch in $branches) { if ($branch.name -like $_) { ++$count; } }
+    Write-Host "[$count] " -nonewline
     Write-Host -foregroundcolor gray $_
-    if (-not (($branches).name -Contains $_)) { Write-Warning "Unknown branch '$_'." }
+    if ($count -eq 0) { Write-Warning "No matches was found for igrored branch '$_'" }
   }
 }
 
-$branches = @($branches | Where-Object { $now - $_.date -gt $alive } | Where-Object { -not ($ignoreBranches -Contains $_.name) })
+$branches = @($branches | Where-Object { $now - $_.date -gt [System.TimeSpan]::FromDays($graceDays) } | Where-Object {
+  foreach ($ignoreBranch in $ignoreBranches) { if ($_.name -like $ignoreBranch) { return $false; } }
+  return $true;
+})
 
 if ($branches.Length -eq 0) { Write-Host "No old branches were detected" } else {
   $hgSubFile = "$root\.hgsub"
