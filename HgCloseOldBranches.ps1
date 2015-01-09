@@ -70,7 +70,7 @@ function GetIgnoreFilter {
   return @();
 }
 
-$ignoreBranches += GetIgnoreFilter @(Split-Path -parent $MyInvocation.MyCommand.Definition)
+$ignoreBranches += GetIgnoreFilter $(Split-Path -parent $MyInvocation.MyCommand.Definition)
 $ignoreBranches += GetIgnoreFilter $root
 
 [System.Object]$current = & hg parent --encoding $encoding -T "{node} {branch}" | ForEach-Object {
