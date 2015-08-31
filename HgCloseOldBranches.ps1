@@ -73,7 +73,7 @@ function GetIgnoreFilter {
 $ignoreBranches += GetIgnoreFilter $(Split-Path -parent $MyInvocation.MyCommand.Definition)
 $ignoreBranches += GetIgnoreFilter $root
 
-[System.Object]$current = & hg parent --encoding $encoding -T "{node} {branch}" | ForEach-Object {
+[System.Object]$current = & hg parent --encoding $encoding --template "{node} {branch}" | ForEach-Object {
   $result = $_ | Select-Object -Property node, name
   $parts = $_.Split(' ', 2)
 
@@ -85,11 +85,11 @@ $ignoreBranches += GetIgnoreFilter $root
 Write-Host "Current branch: " -nonewline
 Write-Host -foregroundcolor gray $current.name
 
-[System.Object[]]$branches = @(& hg head --encoding $encoding -T "{date(date,'%Y%m%d%H%M%S')} {node} {branch}\n" | ForEach-Object {
+[System.Object[]]$branches = @(& hg head --encoding $encoding --template "{date|isodate}|{node}|{branch}\n" | ForEach-Object {
   $result = $_ | Select-Object -Property date, node, name
-  $parts = $_.Split(' ', 3)
+  $parts = $_.Split('|', 3)
 
-  [System.DateTime]$result.date = [System.DateTime]::ParseExact($parts[0], "yyyyMMddHHmmss", [System.Globalization.CultureInfo]::InvariantCulture)
+  [System.DateTime]$result.date = [System.DateTime]::Parse($parts[0])
   $result.node = $parts[1]
   $result.name = $parts[2]
   $result
